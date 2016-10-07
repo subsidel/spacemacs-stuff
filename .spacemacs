@@ -33,6 +33,8 @@ values."
      rust
      javascript
      elm
+     spotify
+     haskell
      ;; (shell :variables
      ;;        shell-default-height 30
      ;;        shell-default-position 'bottom)
@@ -44,7 +46,13 @@ values."
    ;; wrapped in a layer. If you need some configuration for these
    ;; packages, then consider creating a layer. You can also put the
    ;; configuration in `dotspacemacs/user-config'.
-   dotspacemacs-additional-packages '()
+   dotspacemacs-additional-packages
+   '(
+     all-the-icons
+     eslint-fix
+     forest-blue-theme
+     ag
+     )
    ;; A list of packages and/or extensions that will not be install and loaded.
    dotspacemacs-excluded-packages '()
    ;; If non-nil spacemacs will delete any orphan packages, i.e. packages that
@@ -99,7 +107,8 @@ values."
    ;; List of themes, the first of the list is loaded when spacemacs starts.
    ;; Press <SPC> T n to cycle to the next theme in the list (works great
    ;; with 2 themes variants, one dark and one light)
-   dotspacemacs-themes '(spacemacs-dark
+   dotspacemacs-themes '(forest-blue
+                         spacemacs-dark
                          spacemacs-light
                          solarized-light
                          solarized-dark
@@ -110,7 +119,7 @@ values."
    dotspacemacs-colorize-cursor-according-to-state t
    ;; Default font. `powerline-scale' allows to quickly tweak the mode-line
    ;; size to make separators look not too crappy.
-   dotspacemacs-default-font '("Ubuntu mono"
+   dotspacemacs-default-font '("Source Code Pro"
                                :size 13
                                :weight normal
                                :width normal
@@ -253,10 +262,97 @@ layers configuration.
 This is the place where most of your configurations should be done. Unless it is
 explicitly specified that a variable should be set before a package is loaded,
 you should place your code here."
+  (require 'all-the-icons)
+
   (setq-default js2-basic-offset 2)
   (setq-default js-indent-level 2)
 
+  ;;(set-frame-parameter (selected-frame) 'alpha '(<active> . <inactive>))
+  ;;(set-frame-parameter (selected-frame) 'alpha <both>)
+  (set-frame-parameter (selected-frame) 'alpha '(85 . 50))
+  (add-to-list 'default-frame-alist '(alpha . (85 . 50)))
+  (defun toggle-transparency ()
+    (interactive)
+    (let ((alpha (frame-parameter nil 'alpha)))
+      (set-frame-parameter
+       nil 'alpha
+       (if (eql (cond ((numberp alpha) alpha)
+                      ((numberp (cdr alpha)) (cdr alpha))
+                      ;; Also handle undocumented (<active> <inactive>) form.
+                      ((numberp (cadr alpha)) (cadr alpha)))
+                100)
+           '(85 . 50) '(100 . 100)))))
+  (global-set-key (kbd "C-c t") 'toggle-transparency)
+  ;; Set transparency of emacs
+  (defun transparency (value)
+    "Sets the transparency of the frame window. 0=transparent/100=opaque"
+    (interactive "nTransparency Value 0 - 100 opaque:")
+    (set-frame-parameter (selected-frame) 'alpha value))
+  (transparency 60)
+  (display-time-mode 1)
+  (load-theme 'forest-blue t)
+  (with-eval-after-load "neotree"
+    (defun neo-buffer--insert-fold-symbol (name &optional file-name)
+      "Custom overriding function for the fold symbol.
+`NAME' decides what fold icon to use, while `FILE-NAME' decides
+what file icon to use."
+      (or (and (equal name 'open)  (insert (all-the-icons-icon-for-dir file-name "down")))
+          (and (equal name 'close) (insert (all-the-icons-icon-for-dir file-name "right")))
+          (and (equal name 'leaf)  (insert (format "\t\t\t%s\t" (all-the-icons-icon-for-file file-name))))))
+
+    (defun neo-buffer--insert-dir-entry (node depth expanded)
+      (let ((node-short-name (neo-path--file-short-name node)))
+        (insert-char ?\s (* (- depth 1) 2)) ; indent
+        (when (memq 'char neo-vc-integration)
+          (insert-char ?\s 2))
+        (neo-buffer--insert-fold-symbol
+         (if expanded 'open 'close) node)
+        (insert-button (concat node-short-name "/")
+                       'follow-link t
+                       'face neo-dir-link-face
+                       'neo-full-path node
+                       'keymap neotree-dir-button-keymap)
+        (neo-buffer--node-list-set nil node)
+        (neo-buffer--newline-and-begin)))
+
+    (defun neo-buffer--insert-file-entry (node depth)
+      (let ((node-short-name (neo-path--file-short-name node))
+            (vc (when neo-vc-integration (neo-vc-for-node node))))
+        (insert-char ?\s (* (- depth 1) 2)) ; indent
+        (when (memq 'char neo-vc-integration)
+          (insert-char (car vc))
+          (insert-char ?\s))
+        (neo-buffer--insert-fold-symbol 'leaf node-short-name)
+        (insert-button node-short-name
+                       'follow-link t
+                       'face (if (memq 'face neo-vc-integration)
+                                 (cdr vc)
+                               neo-file-link-face)
+                       'neo-full-path node
+                       'keymap neotree-file-button-keymap)
+        (neo-buffer--node-list-set nil node)
+        (neo-buffer--newline-and-begin))))
+  (eval-after-load 'js-mode
+    '(add-hook 'js-mode-hook (lambda () (add-hook 'after-save-hook 'eslint-fix nil t))))
+
+  (eval-after-load 'js2-mode
+    '(add-hook 'js2-mode-hook (lambda () (add-hook 'after-save-hook 'eslint-fix nil t))))
   )
 
 ;; Do not write anything past this comment. This is where Emacs will
 ;; auto-generate custom variable definitions.
+(custom-set-variables
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(custom-safe-themes
+   (quote
+    ("66881e95c0eda61d34aa7f08ebacf03319d37fe202d68ecf6a1dbfd49d664bc3" default))))
+(custom-set-faces
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(company-tooltip-common ((t (:inherit company-tooltip :weight bold :underline nil))))
+ '(company-tooltip-common-selection ((t (:inherit company-tooltip-selection :weight bold :underline nil)))))
